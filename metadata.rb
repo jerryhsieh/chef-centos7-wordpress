@@ -6,4 +6,4 @@ description      'Installs/Configures wordpress'
 long_description 'Installs/Configures wordpress'
 version          '0.1.0'
 
-depends 'mysql', '~> 8.0'
+

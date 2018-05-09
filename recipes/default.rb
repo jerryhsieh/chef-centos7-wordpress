@@ -44,33 +44,37 @@ execute 'mysql-community-server' do
   action :run
 end
 
-# sudo grep 'temporary password' /var/log/mysqld.log
-#  myql -u root -p
-#  ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyNewPass4!';
-
-# bash 'secure install' do
-#   user 'root'
-#   cwd '/tmp'
-#   code <<-EOH
-#      mysql_secure_installation
-#      send '/r'
-#      send 'Y/r'
-#      send '#{node['mysql']['tmppwd']}/r'
-#      send '#{node['mysql']['tmppwd']}/r'
-#      send 'Y/r'    
-#      send 'Y/r'
-#      send 'Y/r'
-#      send 'Y/r'
-#   EOH
-# end
-
-
 service 'mysqld' do
   action [:enable, :start]
 end
 
+# Required by `database` cookbook MySQL resources:, doesn't work, manually do mysql_secure_installation
+# mysql2_chef_gem 'default' do
+#   action :install
+# end
+
+# connection_info = {
+#   :host     => '127.0.0.1',
+#   :username => 'root',
+#   :password => 'Jerry001!'
+# }
+
+# mysql_database 'mysql_secure_installation' do
+#   connection connection_info
+#   database_name 'mysql'
+#   sql <<-EOH
+#       CREATE USER 'Jerry'@'localhost' IDENTIFIED BY 'password';
+#       CREATE DATABASE wordpress DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+#       GRANT ALL ON wordpress.* TO 'Jerry'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';    # current bug in mysql 8
+#       FLUSH PRIVILEGES;
+#       EXIT;   
+#   EOH
+#   action :query
+# end
+
+
 # install php-fpm
-package ["php-fpm", "php-mysql", "php-cli"] do
+package ["php-fpm", "php-mysql", "php-cli", "php-gd"] do
   action :install
 end
 
@@ -78,11 +82,63 @@ service 'php-fpm' do
   action [:enable, :start]
 end
 
-# generate wordpress virtual machine
-template "#{node['nginx']['dir']}/conf.d/#{node['wordpress']['config']}" do
-          source "wordpress.conf.erb"
+# create /var/www directory
+directory '/var/www/wordpress' do
+  owner 'nginx'
+  group 'nginx'
+  mode '0755'
+  recursive true
+  action :create
+end
+
+file '/var/www/wordpress/index.php' do
+  content "<?php phpinfo(); ?>"
+  owner 'nginx'
+  group 'nginx'
+  mode '0755'  
+end
+
+#
+# manully update /etc/php-fpm.d/www.cnf
+# for user, group set to nginx
+# and link to unix:/var/run/php-fpm/www.sock  in stead of port
+#
+
+# generate wordpress /wordpress location
+template "#{node['nginx']['dir']}/default.d/#{node['wordpress']['config']}" do
+          source "wordpress.location.erb"
           notifies :restart, "service[nginx]"
 end
+
+
+#
+# install wordpress
+#
+bash "install wordpress" do
+  user 'root'
+  cwd '/tmp'
+  code <<-EOH
+       wget https://wordpress.org/latest.tar.gz
+       tar zxf latest.tar.gz
+       cp -avr wordpress/* /var/www/wordpress/
+       mkdir /var/www/wordpress/wp-content/uploads
+       chown -R nginx:nginx /var/www/wordpress/
+       chmod -R 755 /var/www/wordpress/
+  EOH
+  not_if { ::File.exists?("/var/www/wordpress/wp-config.php") }
+end
+
+#
+# wordpress selinux security issue
+bash "change selinux" do
+   user 'root'
+   code <<-EOH
+        chcon -t httpd_sys_content_t /var/www/wordpress -R
+        chcon -t httpd_sys_rw_content_t /var/www/wordpress/wp-config.php
+        chcon -t httpd_sys_rw_content_t /var/www/wordpress/wp-content -R
+   EOH
+end
+
 
 
 # yum install development tools
@@ -134,4 +190,12 @@ bash "install git" do
        source /etc/bashrc
   EOH
   not_if { ::File.exists?("/usr/local/git/bin/git") }
+end
+
+# git clone emacs
+git '/home/vagrant/.emacs.d' do
+  user 'vagrant'
+  repository 'https://github.com/jerryhsieh/.emacs.d.git'
+  revision 'master'
+  action :sync
 end

@@ -1,0 +1,35 @@
+location ^~ /wordpress {
+         root /var/www;
+	 index index.php;
+	 #try_files $uri $uri/ /wordpress/index.php?$args;
+         try_files $uri $uri/ /wordpress/index.php?$args;
+	 #client_max_body_size 15G;
+
+	 # Add trailing slash to */wp-admin requests.
+	rewrite /wordpress/wp-admin$ $scheme://$host$uri/ permanent;	
+	# for sitemap
+	# rewrite ^/sitemap(-+([a-zA-Z0-9_-]+))?\.xml$ "/index.php?xml_sitemap=params=$2" last;
+	# rewrite ^/sitemap(-+([a-zA-Z0-9_-]+))?\.xml\.gz$ "/index.php?xml_sitemap=params=$2;zip=true" last;
+	# rewrite ^/sitemap(-+([a-zA-Z0-9_-]+))?\.html$ "/index.php?xml_sitemap=params=$2;html=true" last;
+	# rewrite ^/sitemap(-+([a-zA-Z0-9_-]+))?\.html.gz$ "/index.php?xml_sitemap=params=$2;html=true;zip=true" last;
+
+	access_log /var/log/nginx/wp_access_log main;
+	error_log /var/log/nginx/wp_error_log info;
+	    
+	location ~ ^/wordpress/(?:\.|data|config|db_structure\.xml|README) {
+ 	     deny all;
+        }
+
+	location ~ \.php/? {
+		  fastcgi_split_path_info ^(.+\.php)(/.+)$;
+		  fastcgi_pass unix:/var/run/php-fpm/www.sock;
+		  fastcgi_param PATH_INFO $fastcgi_path_info;
+		  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		  include fastcgi_params;
+		  fastcgi_param fastcgi_ignore_client_abort on;
+	}
+	location ~* \.(?:jpg|gif|ico|png|css|js|svg)$ {
+		 expires max; add_header Cache-Control public;
+	}
+}
+
