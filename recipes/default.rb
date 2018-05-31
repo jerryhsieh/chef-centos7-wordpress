@@ -18,6 +18,11 @@ user node['wordpress']['user'] do
   password "$1$AEX3vuXK$o9ZWPtzyTLu7yMfABquYc0"
 end
 
+package ["kernel-headers", "kernel-devel"] do
+  action :install
+end
+
+
 yum_package 'wget' do
   action :install
 end
@@ -35,8 +40,9 @@ service 'nginx' do
 end
 
 execute 'mysql-community-repo' do
- command 'yum -y localinstall http://repo.mysql.com/mysql80-community-release-el7-1.noarch.rpm'
- action :run
+  command 'yum -y localinstall http://repo.mysql.com/mysql80-community-release-el7-1.noarch.rpm'
+  command 'yum -y update'
+  action :run
 end
 
 execute 'mysql-community-server' do
@@ -48,6 +54,7 @@ service 'mysqld' do
   action [:enable, :start]
 end
 
+#
 # Required by `database` cookbook MySQL resources:, doesn't work, manually do mysql_secure_installation
 # mysql2_chef_gem 'default' do
 #   action :install
@@ -59,6 +66,9 @@ end
 #   :password => 'Jerry001!'
 # }
 
+#
+# first time temp password use grep 'temporary password' /var/log/mysqld.log
+#
 # mysql_database 'mysql_secure_installation' do
 #   connection connection_info
 #   database_name 'mysql'
@@ -72,10 +82,14 @@ end
 #   action :query
 # end
 
-
 # install php-fpm
 package ["php-fpm", "php-mysql", "php-cli", "php-gd"] do
   action :install
+end
+
+template "#{node['php-fpm']['dir']}/#{node['php-fpm']['config']}" do
+  source "www.conf.erb"
+  notifies :restart, "service[php-fpm]"
 end
 
 service 'php-fpm' do
@@ -91,12 +105,12 @@ directory '/var/www/wordpress' do
   action :create
 end
 
-file '/var/www/wordpress/index.php' do
-  content "<?php phpinfo(); ?>"
-  owner 'nginx'
-  group 'nginx'
-  mode '0755'  
-end
+# file '/var/www/wordpress/index.php' do
+#   content "<?php phpinfo(); ?>"
+#   owner 'nginx'
+#   group 'nginx'
+#   mode '0755'  
+# end
 
 #
 # manully update /etc/php-fpm.d/www.cnf
@@ -104,10 +118,21 @@ end
 # and link to unix:/var/run/php-fpm/www.sock  in stead of port
 #
 
+template "#{node['nginx']['dir']}/conf.d/#{node['wordpress']['config']}" do
+  source "wordpress.conf.erb"
+  notifies :restart, 'service[nginx]'
+end
+
 # generate wordpress /wordpress location
 template "#{node['nginx']['dir']}/default.d/#{node['wordpress']['config']}" do
           source "wordpress.location.erb"
           notifies :restart, "service[nginx]"
+end
+
+# for other php location
+template "#{node['nginx']['dir']}/default.d/#{node['php']['config']}" do
+  source "php.location.erb"
+  notifies :restart, "service[nginx]"
 end
 
 
