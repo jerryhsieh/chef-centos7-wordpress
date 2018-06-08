@@ -175,8 +175,8 @@ package ["indent", "intltool", "libtool", "patch", "patchutils", "rcs", "redhat-
   action :install
 end
 
-# require by emacs 25
-package ["ncurses-devel",  "gnutls-devel",  "libxml2-devel",  "automake",  "autoconf", "texinfo"] do
+# require by emacs 
+package ["ncurses-devel",  "gnutls-devel",  "libxml2-devel",  "automake",  "autoconf", "texinfo", "libacl-devel"] do
   action :install
 end
 
@@ -185,16 +185,16 @@ package ["curl-devel", "expat-devel",  "gettext-devel", "openssl-devel",  "zlib-
   action :install
 end
 
-# build emacs 25 from source
+# build emacs 26 from source
 bash "install emacs" do
   user 'root'
   cwd '/tmp'
   code <<-EOH
-     wget http://git.savannah.gnu.org/cgit/emacs.git/snapshot/emacs-emacs-25.3.tar.gz
-     tar xzvf emacs-emacs-25.3.tar.gz
-     cd emacs-emacs-25.3
+     wget http://git.savannah.gnu.org/cgit/emacs.git/snapshot/emacs-emacs-26.1.tar.gz
+     tar xzvf emacs-emacs-26.1.tar.gz
+     cd emacs-emacs-26.1
      ./autogen.sh
-     ./configure -–with-x-toolkit=no -–with-xpm=no -–with-jpeg=no -–with-png=no -–with-gif=no -–with-tiff=no
+     ./configure --with-gnutls --without-ns --without-x --without-dbus --without-gconf --without-libotf --without-m17n-flt --without-gpm --with-xml2
      make -j4 -sw &> /dev/null
      make install
      EOH
@@ -206,9 +206,9 @@ bash "install git" do
   user 'root'
   cwd '/tmp'
   code <<-EOH
-       wget https://mirrors.edge.kernel.org/pub/software/scm/git/git-2.17.0.tar.gz
-       tar xzvf git-2.17.0.tar.gz
-       cd git-2.17.0
+       wget https://mirrors.edge.kernel.org/pub/software/scm/git/git-2.17.1.tar.gz
+       tar xzvf git-2.17.1.tar.gz
+       cd git-2.17.1
        make prefix=/usr/local/git all
        make prefix=/usr/local/git install
        echo 'export PATH=$PATH:/usr/local/git/bin' >> /etc/bashrc
